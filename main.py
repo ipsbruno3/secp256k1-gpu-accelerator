@@ -39,7 +39,7 @@ platform = cl.get_platforms()[0]
 device = platform.get_devices()[0]
 ctx = cl.Context([device])
 queue = cl.CommandQueue(ctx)
-program = build_kernel(ctx, "opencl/funcional.cl")
+program = build_kernel(ctx, "opencl/main.cl")
    
     
 
