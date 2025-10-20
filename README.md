@@ -97,7 +97,9 @@ It is **not intended or approved for private-key recovery or unauthorized data a
 ---
 
 **Author:** Bruno da Silva
+
 **Contact:** [bsbruno@pm.me](mailto:bsbruno@pm.me)
+
 **Focus:** GPU Cryptography • Security Research • High-Performance Computing
 
 ---
