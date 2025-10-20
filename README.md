@@ -73,7 +73,7 @@ All temporaries are stack-allocated arrays (`uint[8]` or `uint[16]`).
 * Arithmetic path is **deterministic and reproducible**.
 * Benchmarked throughput:
 
-  * **≈50M ops/s** (non-sequential kernel)
+  * **≈100M ops/s** (non-sequential kernel)
   * **≈1B ops/s** (sequential scan mode)
 * CPU baseline: **>400× slower**, confirming correct GPU acceleration.
 
