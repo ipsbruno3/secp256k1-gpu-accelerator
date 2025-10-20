@@ -446,7 +446,10 @@ __kernel void point_mul_xy(__global uint *x1, __global uint *y1, __global uint *
   mul_mod(y, y, z1);
   copy_eight(x1+g, x);
   copy_eight(y1+g, y);
-}__kernel void point_mul_xy_seq(__global uint *x1, __global uint *y1, __global ulong *from, __global ulong *size, __global ulong *results) {
+}
+
+
+__kernel void point_mul_xy_seq(__global uint *x1, __global uint *y1, __global ulong *from, __global ulong *size, __global ulong *results) {
   // ... rest of code .
   uint g = get_global_id(0);
 
