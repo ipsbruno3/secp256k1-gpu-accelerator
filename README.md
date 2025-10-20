@@ -8,6 +8,19 @@
 
 This project explores **low-latency elliptic-curve arithmetic on GPUs**, designed for **benchmarking, cryptographic research, and defensive security testing** involving the Bitcoin **secp256k1** curve.
 
+
+---
+
+
+#### ✅  NVIDIA 5090 
+<img width="945" height="171" alt="image" src="https://github.com/user-attachments/assets/41052068-cfa7-4337-959f-7ce1afeb5079" />
+
+#### ✅  NVIDIA 5070 TI
+<img width="1244" height="203" alt="image" src="https://github.com/user-attachments/assets/9906067c-bab3-43b6-968e-cb5f3fcc5f1d" />
+
+
+
+
 ---
 
 ### 🧠 Core Engineering Strategies
