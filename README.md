@@ -1,97 +1,103 @@
-# secp256k1-gpu-accelerator
-## ⚡ 1 billion throughput (ops/s) — high-performance Bitcoin ecc secp256k1 opencl kernels for testing; defense
+
+
+# **secp256k1-gpu-accelerator**
 
 ---
 
-### ⚡ High-Performance secp256k1 GPU Implementation
+## ⚡ High-Performance secp256k1 GPU Implementation
 
-This project explores *low-latency elliptic-curve arithmetic on GPUs*, designed for benchmarking, research and security-testing workloads with Eliptic Curves.
+This project explores **low-latency elliptic-curve arithmetic on GPUs**, designed for **benchmarking, cryptographic research, and defensive security testing** involving the Bitcoin **secp256k1** curve.
 
-### 🧠 Core Strategies
+---
 
-#### 1. **Arithmetic in Native PTX**
+### 🧠 Core Engineering Strategies
 
-All 256-bit field operations (`add`, `sub`, `mul`, `inv`) are hand-optimized with inline PTX using
+#### 1. **Native PTX Arithmetic**
+
+All 256-bit field operations (`add`, `sub`, `mul`, `inv`) are manually optimized with **inline PTX**, using
 `add.cc.u32` / `addc.u32` and `sub.cc.u32` / `subc.u32` carry chains.
-These intrinsics let the kernel run multi-limb arithmetic entirely in registers — no branching, no memory stalls — producing 2-3× higher throughput than compiler-generated code.
+This approach lets the GPU execute full 256-bit arithmetic directly in registers — **no branching, no memory stalls** — achieving up to **3× higher throughput** than compiler-generated code.
 
-#### 2. **Register-Resident Big-Int Layout**
+#### 2. **Register-Resident Big-Integer Layout**
 
-Eight 32-bit limbs per scalar stay in registers for all operations.
-Macros like `copy_eight`, `shift_first`, and `is_zero` eliminate pointer arithmetic and minimize memory pressure.
-Every kernel operates in a register-only hot path, keeping SM occupancy high and avoiding spills to local memory.
+Eight 32-bit limbs per scalar are held entirely in registers.
+Helper macros (`copy_eight`, `shift_first`, `is_zero`) remove pointer overhead and keep every operation inside a **hot register path**, preserving high SM occupancy and avoiding local memory spills.
 
-#### 3. **Jacobian Coordinates & Modular Reduction**
+#### 3. **Jacobian Coordinates & Pseudo-Mersenne Reduction**
 
-Point doubling and addition (`point_double`, `point_add`) use Jacobian coordinates to avoid costly inversions.
-The modular field arithmetic follows the *pseudo-Mersenne* form of the secp256k1 prime
+Group operations (`point_add`, `point_double`) use **Jacobian coordinates**, avoiding costly inversions.
+Field arithmetic is implemented using the pseudo-Mersenne prime
 ( p = 2^{256} - 2^{32} - 977 ),
-folding high limbs with constants `0x3d1` and `0x03d1` for efficient reduction inside 64-bit intermediate products.
+folding upper limbs with constants `0x3d1` and `0x03d1` for **branch-free modular reduction**.
 
-#### 4. **Windowed NAF Scalar Expansion (8-bit)**
+#### 4. **8-Bit Windowed NAF Expansion**
 
-`convert_to_window_naf()` implements an 8-bit *windowed Non-Adjacent Form*, packing four coefficients per 32-bit word.
-This drastically reduces the number of point additions in the scalar multiplication loop, balancing compute vs. memory footprint.
+`convert_to_window_naf()` encodes scalars in **8-bit Non-Adjacent Form**, packing four coefficients per 32-bit word.
+This reduces the number of point additions in scalar multiplication while balancing compute intensity and memory footprint.
 
-#### 5. **Pre-Computation in Constant Memory**
+#### 5. **Precomputation in Constant Memory**
 
-The kernel reads from `__constant__ uint secpk256PreComputed[1536]`, a flattened table of pre-computed (x,y) pairs.
-Because constant memory is broadcast across warps, every thread accesses the same cache line for the same window — zero divergence, near-perfect cache hit rate.
+Precomputed (x,y) pairs are stored in
+`__constant__ uint secpk256PreComputed[1536]`.
+Constant memory broadcasts the same line to all threads in a warp, resulting in **zero divergence** and **near-perfect cache efficiency**.
 
 #### 6. **SIMD-Style Parallelism**
 
-Each GPU thread performs one scalar multiply or a sequence of point additions; thousands of threads execute in lockstep.
-The `point_mul_xy_seq` kernel handles sequential chains efficiently by keeping the Z coordinate and performing incremental additions without redundant inversions.
+Each thread computes one scalar multiplication or sequential chain.
+The `point_mul_xy_seq` kernel optimizes **sequential additions** by reusing the same Z coordinate and avoiding redundant modular inversions.
 
 #### 7. **Low-Level Memory Discipline**
 
-No dynamic allocation.
-All temporaries are stack-allocated arrays of `uint[8]` or `uint[16]`.
-Use of `#pragma unroll` hints to the compiler enables full loop unrolling inside arithmetic primitives.
+No dynamic memory.
+All temporaries are stack-allocated arrays (`uint[8]` or `uint[16]`).
+`#pragma unroll` fully unrolls critical arithmetic loops, maximizing ILP (instruction-level parallelism).
 
 ---
 
 ### 🚀 Performance Notes
 
-* Designed for CUDA / OpenCL cross-compatibility.
-* GPU arithmetic is fully deterministic and reproducible.
-* Achieved throughput (benchmarked): **hundreds of millions of point additions per second** on modern consumer GPUs.
-* CPU fallback demonstrates >400× performance difference, confirming correct GPU acceleration.
-* 50M ops/sec non sequential
-* 1B ops/sec on sequential scanning
+* Cross-compatible with **CUDA** and **OpenCL**.
+* Arithmetic path is **deterministic and reproducible**.
+* Benchmarked throughput:
+
+  * **≈50M ops/s** (non-sequential kernel)
+  * **≈1B ops/s** (sequential scan mode)
+* CPU baseline: **>400× slower**, confirming correct GPU acceleration.
 
 ---
 
 ### ⚙️ Key Components
 
-| Function                           | Purpose                                                                |
-| ---------------------------------- | ---------------------------------------------------------------------- |
-| `add`, `sub`, `add_mod`, `sub_mod` | Multi-limb arithmetic with carry/borrow propagation                    |
-| `mul_mod`                          | Karatsuba-style schoolbook multiplication + pseudo-Mersenne reduction  |
-| `inv_mod`                          | Binary extended GCD inversion in Jacobian form                         |
-| `point_add`, `point_double`        | Core elliptic-curve group operations                                   |
-| `convert_to_window_naf`            | Converts scalar to windowed NAF representation (8-bit)                 |
-| `point_mul_xy`, `point_mul_xy_seq` | Scalar multiplication kernels for independent and sequential workloads |
+| Function                           | Purpose                                                    |
+| ---------------------------------- | ---------------------------------------------------------- |
+| `add`, `sub`, `add_mod`, `sub_mod` | Multi-limb arithmetic with carry/borrow propagation        |
+| `mul_mod`                          | Pseudo-Mersenne modular multiplication                     |
+| `inv_mod`                          | Binary extended-GCD inversion                              |
+| `point_add`, `point_double`        | Core elliptic-curve group ops                              |
+| `convert_to_window_naf`            | 8-bit NAF scalar expansion                                 |
+| `point_mul_xy`, `point_mul_xy_seq` | Scalar multiplication kernels (independent and sequential) |
 
 ---
 
 ### 🧩 Technical Highlights
 
-* **Inline PTX arithmetic** (no compiler overhead)
-* **Full unrolling** of modular loops
-* **Constant-time arithmetic** for deterministic execution
-* **Memory-aware layout** minimizing bandwidth per operation
-* **Low-latency intrinsics and instruction-level parallelism**
+* **Inline PTX** for 256-bit carry chains
+* **Full loop unrolling** for modular arithmetic
+* **Constant-time execution** — deterministic across warps
+* **Cache-aware data layout** for minimal bandwidth
+* **Low-latency SIMD pipelines** leveraging GPU intrinsics
 
 ---
 
 ### ⚠️ Responsible Use
 
-This implementation is provided **for benchmarking, cryptographic research, and defensive security analysis only**.
-It is **not** intended or endorsed for unauthorized key recovery or cracking applications.
+This repository is provided **solely for benchmarking, cryptographic research, and defensive security testing**.
+It is **not intended or approved for private-key recovery or unauthorized data access**.
 
 ---
 
-bsbruno@pm.me
-Bruno da Silva
-Security Research
+**Author:** Bruno da Silva
+**Contact:** [bsbruno@pm.me](mailto:bsbruno@pm.me)
+**Focus:** GPU Cryptography • Security Research • High-Performance Computing
+
+---
